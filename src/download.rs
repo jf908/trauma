@@ -12,6 +12,8 @@ pub struct Download {
     pub url: Url,
     /// File name used to save the file on disk.
     pub filename: String,
+    /// Forces resumable
+    pub force_resumable: bool,
 }
 
 impl Download {
@@ -40,6 +42,7 @@ impl Download {
         Self {
             url: url.clone(),
             filename: String::from(filename),
+            force_resumable: false,
         }
     }
 
@@ -48,6 +51,9 @@ impl Download {
         &self,
         client: &ClientWithMiddleware,
     ) -> Result<bool, reqwest_middleware::Error> {
+        if self.force_resumable {
+            return Ok(true);
+        }
         let res = client.head(self.url.clone()).send().await?;
         let headers = res.headers();
         match headers.get(ACCEPT_RANGES) {
@@ -77,6 +83,7 @@ impl TryFrom<&Url> for Download {
                 filename: form_urlencoded::parse(filename.as_bytes())
                     .map(|(key, val)| [key, val].concat())
                     .collect(),
+                force_resumable: false,
             })
             .ok_or_else(|| {
                 Error::InvalidUrl(format!("the url \"{}\" does not contain a filename", value))
